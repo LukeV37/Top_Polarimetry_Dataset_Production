@@ -1,7 +1,3 @@
-[submodule "mg5amcnlo"]
-	path = submodules/mg5amcnlo-v3.5.5
-	url = https://github.com/mg5amcnlo/mg5amcnlo.git
-	ignore = dirty
 [submodule "pythia"]
 	path = submodules/pythia-v8.312
 	url = https://gitlab.com/Pythia8/releases.git
