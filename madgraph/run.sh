@@ -47,8 +47,8 @@ sed "s/multi_run.*/multi_run $num_runs/" include/multi_run.config > multi_run.tm
 sed -i "s/set nevents.*/set nevents $num_events_per_run/" multi_run.tmp
 sed -i "s/set iseed.*/set iseed $seed/" multi_run.tmp
 
-# Run mg5_aMC binary on the process card
-../submodules/mg5amcnlo-v3.5.5/bin/mg5_aMC proc_card.tmp
+# Run MadGraph 3.5.17 from the tarball install
+../submodules/mg5amcnlo-v3.5.17/bin/mg5_aMC proc_card.tmp
 
 # Copy the cuts.f card to the SubProcesses folder
 cp ./include/cuts.f "./pp_tt_semi_full_${dataset_tag}/SubProcesses/"
