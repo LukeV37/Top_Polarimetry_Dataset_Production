@@ -1,6 +1,7 @@
 # LHE READER code to read MG5 LHE output
 
 
+import gzip
 import xml.etree.ElementTree as ET
 import ROOT
 from ROOT import TFile, TTree, std
@@ -9,8 +10,11 @@ import argparse
 
 
 def read_xml(filename):
-
-    tree = ET.parse(filename)
+    if filename.endswith(".gz"):
+        with gzip.open(filename, "rb") as source:
+            tree = ET.parse(source)
+    else:
+        tree = ET.parse(filename)
     root = tree.getroot()
     return root
 
