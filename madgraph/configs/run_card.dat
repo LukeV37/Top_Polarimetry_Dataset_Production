@@ -86,6 +86,7 @@
 # list of files containing fortran function that overwrite default   *
 #*********************************************************************
   = custom_fcts ! List of files containing user hook function
+  200.0 = min_hadronic_top_pt ! Hadronic top pT cut in GeV
 #*******************************                                                 
 # Parton level cuts definition *
 #*******************************
@@ -207,4 +208,3 @@
 #
 systematics = systematics_program ! none, systematics [python], SysCalc [depreceted, C++]
 ['--mur=0.5,1,2', '--muf=0.5,1,2', '--pdf=errorset'] = systematics_arguments ! see: https://cp3.irmp.ucl.ac.be/projects/madgraph/wiki/Systematics#Systematicspythonmodule
-
