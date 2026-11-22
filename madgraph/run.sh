@@ -126,12 +126,33 @@ function calc_labels {
     python include/TLorentz_Labels.py "$tag" "$run"
 }
 
+validate_label_outputs() {
+    python - "$dataset_tag" "$num_runs" <<'PY'
+import sys
+import uproot
+
+tag, num_runs = sys.argv[1], int(sys.argv[2])
+for run in range(num_runs):
+    hard_process_file = f"pp_tt_semi_full_{tag}/hard_process_{tag}_{run}.root"
+    labels_file = f"pp_tt_semi_full_{tag}/labels_{tag}_{run}.root"
+    with uproot.open(hard_process_file) as hard_file, uproot.open(labels_file) as label_file:
+        hard_entries = hard_file["events"].num_entries
+        label_entries = label_file["labels"].num_entries
+    if hard_entries != label_entries:
+        raise SystemExit(
+            f"Entry count mismatch for run {run}: {hard_entries} hard-process entries, "
+            f"{label_entries} label entries"
+        )
+    print(f"Validated {label_entries} entries for run {run}")
+PY
+}
+
 job=0
 batch=1
 for (( i=0 ; i<$num_runs ; i++ ));
 do
     echo -e "\t\tSubmitting job to calc labels: $i"
-    calc_labels $dataset_tag $i &
+    calc_labels "$dataset_tag" "$i" &
     job=$((job+1))
     if [ $job == $max_cpu_cores ]; then
         echo -e "\tStopping jobs submissions! Please wait for batch $batch to finish..."
@@ -141,6 +162,7 @@ do
     fi
 done
 wait || exit 1
+validate_label_outputs
 
 echo
 echo -e "\tMadGraph Generation Done!"
