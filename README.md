@@ -52,7 +52,7 @@ Set `ANALYSIS_OUTPUT_DIR` to an absolute path to write elsewhere. Selection
 thresholds and array capacities are listed in `job.config` and `debug.config`;
 the overlap threshold defaults to 1.5 and is independent of the jet radii
 recorded in the rendered Delphes card. See the
-[selection design and branch summary](docs/delphes_selection_design.md) for
+[selection and branch reference](analysis/README.md) for
 the cutflow, output fields, and overflow behavior. Files are not merged by
 the runner; only merge successful outputs with identical settings and schemas.
 
