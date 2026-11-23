@@ -28,7 +28,33 @@ To shower in pythia, run the following
 cd pythia
 ./run.sh
 ```
-The training data will be written to a root file. 
+Pythia writes one HepMC file per run. Delphes reads those files and writes
+reconstructed objects to ROOT.
+
+### ROOT analysis selection (MVP)
+
+Run the debug configuration from the repository root with ROOT (`root-config`)
+and the built Delphes library available:
+
+```bash
+./run_job.sh debug.config
+```
+
+Set the bypass options in `debug.config` to skip earlier stages when processing
+existing inputs. `run_job.sh` passes the analysis settings from the config to
+the selection; a direct invocation of `analysis/run.sh` instead uses defaults
+or explicitly supplied analysis environment variables.
+
+This pairs Delphes and MadGraph label files by `_i` job suffix, applies the
+selection, and writes `analysis/WS_<DELPHES_TAG>/dataset_selected_<DELPHES_TAG>_<i>.root`
+and a per-job cutflow log under `logs/`. Each output has one `selected` TTree.
+Set `ANALYSIS_OUTPUT_DIR` to an absolute path to write elsewhere. Selection
+thresholds and array capacities are listed in `job.config` and `debug.config`;
+the overlap threshold defaults to 1.5 and is independent of the jet radii
+recorded in the rendered Delphes card. See the
+[selection design and branch summary](docs/delphes_selection_design.md) for
+the cutflow, output fields, and overflow behavior. Files are not merged by
+the runner; only merge successful outputs with identical settings and schemas.
 
 ## Build dependencies
 
