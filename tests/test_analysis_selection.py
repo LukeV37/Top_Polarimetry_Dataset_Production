@@ -292,10 +292,20 @@ def test_boundaries_and_event_sequence(root_build, tmp_path):
     subprocess.run(cmd, env=env, check=True)
     with uproot.open(f"{output}:selected") as tree:
         assert "source_entry" not in tree
-        documented = re.findall(
-            r"^\| `([A-Za-z0-9_]+)` \| `(Float_t|Int_t)(?:\[(Nc|Nj)\])?` \|",
+        documented = []
+        rows = re.findall(
+            r"^\| `([A-Za-z0-9_,{}]+)` \| `(Float_t|Int_t)(?:\[(Nc|Nj)\])?` \|",
             (ANALYSIS / "README.md").read_text(), flags=re.MULTILINE,
         )
+        for pattern, dtype, capacity in rows:
+            grouped = re.fullmatch(r"(\w+)_\{([^{}]+)\}_\{([^{}]+)\}", pattern)
+            if grouped:
+                particle, components, frames = grouped.groups()
+                documented.extend((f"{particle}_{component}_{frame}", dtype, capacity)
+                                  for component in components.split(",") for frame in frames.split(","))
+            else:
+                assert "{" not in pattern and "}" not in pattern
+                documented.append((pattern, dtype, capacity))
         assert len(documented) == 85
         assert set(name for name, _, _ in documented) == set(tree.keys())
         for name, dtype, capacity in documented:

@@ -50,7 +50,7 @@ aggregate overflow counts. Selection choices remain subject to physics review.
 
 ## Output branches
 
-Each tree entry is one accepted event. The tables list every branch produced
+Each tree entry is one accepted event. The tables specify every branch produced
 by the current implementation. `Float_t` is a 32-bit float and `Int_t` is a
 32-bit signed integer. `Nc` and `Nj` denote the configured fixed array
 capacities, 100 and 10 by default. In the ROOT file the array lengths are
@@ -154,54 +154,14 @@ top rest frame. This preserves the existing label convention.
 |---|---|---|---|
 | `costheta_down` | `Float_t` | — | Cosine for the down-type daughter and the top direction. |
 | `costheta_bottom` | `Float_t` | — | Cosine for the bottom daughter and the top direction. |
-| `top_px_lab` | `Float_t` | GeV | Hadronic top px in the lab frame. |
-| `top_py_lab` | `Float_t` | GeV | Hadronic top py in the lab frame. |
-| `top_pz_lab` | `Float_t` | GeV | Hadronic top pz in the lab frame. |
-| `top_E_lab` | `Float_t` | GeV | Hadronic top energy in the lab frame. |
-| `top_px_ttCM` | `Float_t` | GeV | Hadronic top px in the ttbar CM frame. |
-| `top_py_ttCM` | `Float_t` | GeV | Hadronic top py in the ttbar CM frame. |
-| `top_pz_ttCM` | `Float_t` | GeV | Hadronic top pz in the ttbar CM frame. |
-| `top_E_ttCM` | `Float_t` | GeV | Hadronic top energy in the ttbar CM frame. |
-| `top_px_topRest` | `Float_t` | GeV | Hadronic top px in the top rest frame. |
-| `top_py_topRest` | `Float_t` | GeV | Hadronic top py in the top rest frame. |
-| `top_pz_topRest` | `Float_t` | GeV | Hadronic top pz in the top rest frame. |
-| `top_E_topRest` | `Float_t` | GeV | Hadronic top energy in the top rest frame. |
-| `bottom_px_lab` | `Float_t` | GeV | Hadronic-side bottom px in the lab frame. |
-| `bottom_py_lab` | `Float_t` | GeV | Hadronic-side bottom py in the lab frame. |
-| `bottom_pz_lab` | `Float_t` | GeV | Hadronic-side bottom pz in the lab frame. |
-| `bottom_E_lab` | `Float_t` | GeV | Hadronic-side bottom energy in the lab frame. |
-| `bottom_px_ttCM` | `Float_t` | GeV | Hadronic-side bottom px in the ttbar CM frame. |
-| `bottom_py_ttCM` | `Float_t` | GeV | Hadronic-side bottom py in the ttbar CM frame. |
-| `bottom_pz_ttCM` | `Float_t` | GeV | Hadronic-side bottom pz in the ttbar CM frame. |
-| `bottom_E_ttCM` | `Float_t` | GeV | Hadronic-side bottom energy in the ttbar CM frame. |
-| `bottom_px_topRest` | `Float_t` | GeV | Hadronic-side bottom px in the top rest frame. |
-| `bottom_py_topRest` | `Float_t` | GeV | Hadronic-side bottom py in the top rest frame. |
-| `bottom_pz_topRest` | `Float_t` | GeV | Hadronic-side bottom pz in the top rest frame. |
-| `bottom_E_topRest` | `Float_t` | GeV | Hadronic-side bottom energy in the top rest frame. |
-| `down_px_lab` | `Float_t` | GeV | Down-type daughter px in the lab frame. |
-| `down_py_lab` | `Float_t` | GeV | Down-type daughter py in the lab frame. |
-| `down_pz_lab` | `Float_t` | GeV | Down-type daughter pz in the lab frame. |
-| `down_E_lab` | `Float_t` | GeV | Down-type daughter energy in the lab frame. |
-| `down_px_ttCM` | `Float_t` | GeV | Down-type daughter px in the ttbar CM frame. |
-| `down_py_ttCM` | `Float_t` | GeV | Down-type daughter py in the ttbar CM frame. |
-| `down_pz_ttCM` | `Float_t` | GeV | Down-type daughter pz in the ttbar CM frame. |
-| `down_E_ttCM` | `Float_t` | GeV | Down-type daughter energy in the ttbar CM frame. |
-| `down_px_topRest` | `Float_t` | GeV | Down-type daughter px in the top rest frame. |
-| `down_py_topRest` | `Float_t` | GeV | Down-type daughter py in the top rest frame. |
-| `down_pz_topRest` | `Float_t` | GeV | Down-type daughter pz in the top rest frame. |
-| `down_E_topRest` | `Float_t` | GeV | Down-type daughter energy in the top rest frame. |
-| `W_px_lab` | `Float_t` | GeV | Hadronic W px in the lab frame. |
-| `W_py_lab` | `Float_t` | GeV | Hadronic W py in the lab frame. |
-| `W_pz_lab` | `Float_t` | GeV | Hadronic W pz in the lab frame. |
-| `W_E_lab` | `Float_t` | GeV | Hadronic W energy in the lab frame. |
-| `W_px_ttCM` | `Float_t` | GeV | Hadronic W px in the ttbar CM frame. |
-| `W_py_ttCM` | `Float_t` | GeV | Hadronic W py in the ttbar CM frame. |
-| `W_pz_ttCM` | `Float_t` | GeV | Hadronic W pz in the ttbar CM frame. |
-| `W_E_ttCM` | `Float_t` | GeV | Hadronic W energy in the ttbar CM frame. |
-| `W_px_topRest` | `Float_t` | GeV | Hadronic W px in the top rest frame. |
-| `W_py_topRest` | `Float_t` | GeV | Hadronic W py in the top rest frame. |
-| `W_pz_topRest` | `Float_t` | GeV | Hadronic W pz in the top rest frame. |
-| `W_E_topRest` | `Float_t` | GeV | Hadronic W energy in the top rest frame. |
+| `top_{px,py,pz,E}_{lab,ttCM,topRest}` | `Float_t` | GeV | Hadronic top four-vector. |
+| `bottom_{px,py,pz,E}_{lab,ttCM,topRest}` | `Float_t` | GeV | Hadronic-side bottom four-vector. |
+| `down_{px,py,pz,E}_{lab,ttCM,topRest}` | `Float_t` | GeV | Down-type daughter four-vector. |
+| `W_{px,py,pz,E}_{lab,ttCM,topRest}` | `Float_t` | GeV | Hadronic W four-vector. |
+
+Each brace group denotes every combination of one component and one frame:
+for example, `top_px_lab` and `W_E_topRest`. There are 12 branches per
+particle, plus the two angular-cosine branches.
 
 ## Tree metadata
 
@@ -210,3 +170,37 @@ The tree's ROOT user information contains `MAX_LARGE_R_CONSTITUENTS`,
 not branches. Other settings and the radii read from the rendered Delphes card
 are recorded in the per-job logs, not in the tree. Only merge successful
 outputs with compatible schemas and identical settings.
+
+## Output alignment check
+
+After running the analysis, check the selected jet direction against the
+joined MadGraph hadronic-top lab four-vector:
+
+```bash
+python3 tests/test_analysis_hadronic_top_largeR_alignment.py \
+    --analysis-dir 'analysis/WS_<DELPHES_TAG>'
+```
+
+Replace `<DELPHES_TAG>` with the tag used for the output.
+
+This requires `numpy`, `uproot` and `pytest`. It reports the fraction of
+selected events with `DeltaR(top, selected large-R jet) <= R`, along with the
+unmatched count and distance statistics. By default it requires at least 90%
+to match, like the Delphes alignment check. This is a sample-level validation,
+not an analysis selection cut or a guarantee that every event matches. The
+radius is read from each selected file's analysis log (`R_LARGE`); all logs
+must agree. Use `--jet-radius` if logs are unavailable, and
+`--min-match-fraction` to change the tolerance. These are validation settings,
+not changes to jet reconstruction or event selection.
+
+Alternatively, run:
+
+```bash
+python3 -m pytest -q -s tests/test_analysis_hadronic_top_largeR_alignment.py
+```
+
+This uses the workspace in `debug.config`. `TP_CONFIG` selects another config,
+`TP_ANALYSIS_DIR` overrides the workspace, and `TP_LARGE_R_RADIUS` and
+`TP_MIN_MATCH_FRACTION` override the validation settings. The pytest module
+also exercises the calculation and its failure cases with synthetic ROOT files,
+without regenerating events.
