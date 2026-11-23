@@ -16,6 +16,16 @@ if [[ "$stream_hepmc" == true && "$bypass_pythia" != "$bypass_delphes" ]]; then
   echo "With stream_hepmc=true, Pythia and Delphes must both run or both be bypassed." >&2
   exit 1
 fi
+if [[ "$stream_hepmc" == true && "$bypass_pythia" == false ]]; then
+  if [[ ! ${num_runs:-} =~ ^[1-9][0-9]*$ || ! ${max_cpu_cores:-} =~ ^[1-9][0-9]*$ ]]; then
+    echo "Streaming requires positive num_runs and max_cpu_cores." >&2
+    exit 1
+  fi
+  if (( num_runs > max_cpu_cores )); then
+    echo "Streaming requires num_runs <= max_cpu_cores (got $num_runs > $max_cpu_cores)." >&2
+    exit 1
+  fi
+fi
 
 # Setup python venv
 source setup.sh || exit $?

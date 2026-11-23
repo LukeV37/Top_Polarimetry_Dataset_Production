@@ -18,6 +18,11 @@ runs=$3
 max_cpu_cores=$4
 stream_mg_tag=${5:-}
 
+if [[ -n "$stream_mg_tag" ]] && (( runs > max_cpu_cores )); then
+    echo "Streaming requires num_runs <= max_cpu_cores (got $runs > $max_cpu_cores)." >&2
+    exit 1
+fi
+
 small_r_algorithm=${DELPHES_SMALL_R_ALGORITHM:-antikt}
 small_r=${DELPHES_SMALL_R:-0.4}
 small_r_ptmin=${DELPHES_SMALL_R_PTMIN:-10.0}
@@ -48,12 +53,9 @@ python render_card.py \
     --small-r-parton-ptmin "$small_r_parton_ptmin" \
     --small-r-parton-eta-max "$small_r_parton_eta_max"
 
-workers=$max_cpu_cores
 if [[ -n "$stream_mg_tag" ]]; then
     make -C ../pythia/src generate_dataset
-    # Each pair can use two cores. Always allow at least one pair.
-    workers=$((max_cpu_cores > 1 ? max_cpu_cores / 2 : 1))
-    echo "Streaming Pythia into Delphes ($workers concurrent pairs)..."
+    echo "Streaming Pythia into Delphes ($runs concurrent runs)..."
 else
     echo "Please be patient while Delphes processes the HepMC files..."
 fi
@@ -93,7 +95,7 @@ stream_run() (
     fi
 )
 
-wait_batch() {
+wait_workers() {
     local i failed=0
     for i in "${!pids[@]}"; do
         if ! wait "${pids[i]}"; then
@@ -138,14 +140,14 @@ do
     logs+=("$log_file")
 
     job=$((job+1))
-    if [ "$job" == "$workers" ]; then
+    if [[ -z "$stream_mg_tag" && "$job" == "$max_cpu_cores" ]]; then
         echo -e "\tStopping job submissions! Please wait for batch $batch to finish..."
-        wait_batch
+        wait_workers
         job=0
         batch=$((batch+1))
     fi
 done
 
-wait_batch
+wait_workers
 
 echo -e "\tDelphes Simulation Done!"
