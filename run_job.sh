@@ -2,31 +2,25 @@
 
 # Read options from config
 if [[ -z $1 ]]; then
-  source job.config
+  source job.config || exit $?
 else
-  source $1
+  source "$1" || exit $?
 fi
 
-# Get current directory
-WORKING_DIR=$(pwd)
-
 # Setup python venv
-source setup.sh
+source setup.sh || exit $?
 
 # Run MadGraph Generation
 if [ "$bypass_madgraph" = false ]; then
   start=`date +%s`
-  cd madgraph
-  ./run.sh "$MG_tag" "$process" "$generation" "$num_runs" "$num_events_per_run" "$max_cpu_cores" "$seed" "$top_pT_cut"
-  cd $WORKING_DIR
+  (
+    cd madgraph || exit 1
+    ./run.sh "$MG_tag" "$process" "$generation" "$num_runs" "$num_events_per_run" "$max_cpu_cores" "$seed" "$top_pT_cut"
+  ) || exit $?
   end=`date +%s`
   runtime=$((end-start))
   echo -e "\tTime (sec): $runtime"
 fi
-
-# Calculate number of batches based on max number of cpu available
-# Use python to perform calculations
-num_batches=$(python -c "print(int($num_runs/float($max_cpu_cores))) if $num_runs%$max_cpu_cores==0 else print(int($num_runs/float($max_cpu_cores))+1)")
 
 # Run Pythia Showering
 if [ "$bypass_pythia" = false ]; then
@@ -81,48 +75,26 @@ if [ "$bypass_delphes" = false ]; then
   fi
 fi
 
-# Run preprocessing to match fat jets to top quarks
-if [ "$bypass_preprocessing" = false ]; then
-  echo "Please be patient for Preprocessing..."
+# Join corresponding Delphes and MadGraph entries and select reconstructed events.
+if [ "${bypass_analysis:-true}" = false ]; then
+  : "${DELPHES_tag:?Missing DELPHES_tag in config}"
   start=`date +%s`
-  cd model
-
-  job=0
-  batch=1
-  for (( i=0 ; i<$num_runs ; i++ ));
-  do
-    echo -e "\t\tSubmitting job to preprocess run $i"
-    mkdir -p "${dir_datasets}/run_$i"
-    python -u DataLoader_Parallel.py $PY_tag $i $dir_datasets > "${dir_datasets}/run_$i/preprocessing.log" &
-    job=$((job+1))
-    if [ $job == $max_cpu_cores ]; then
-      echo -e "\tStopping jobs submissions! Please wait for batch $batch to finish..."
-      wait
-      job=0
-      batch=$((batch+1))
-    fi
-  done
-  wait
-
-  python -u Combine_DataSets.py $PY_tag $num_runs $dir_datasets
-  cd $WORKING_DIR
+  ELECTRON_PT_MIN="${ELECTRON_PT_MIN:-30}" \
+  ELECTRON_ABS_ETA_MAX="${ELECTRON_ABS_ETA_MAX:-3}" \
+  MUON_PT_MIN="${MUON_PT_MIN:-30}" \
+  MUON_ABS_ETA_MAX="${MUON_ABS_ETA_MAX:-3}" \
+  MET_MIN="${MET_MIN:-30}" \
+  LARGE_R_JET_PT_MIN="${LARGE_R_JET_PT_MIN:-250}" \
+  LARGE_R_JET_ABS_ETA_MAX="${LARGE_R_JET_ABS_ETA_MAX:-3}" \
+  JET_OVERLAP_DR="${JET_OVERLAP_DR:-1.5}" \
+  LEPTONIC_B_JET_PT_MIN="${LEPTONIC_B_JET_PT_MIN:-30}" \
+  LEPTONIC_B_JET_ABS_ETA_MAX="${LEPTONIC_B_JET_ABS_ETA_MAX:-3}" \
+  LEPTON_B_JET_DR_MIN="${LEPTON_B_JET_DR_MIN:-0.3}" \
+  LEPTON_B_JET_DR_MAX="${LEPTON_B_JET_DR_MAX:-3.0}" \
+  MAX_LARGE_R_CONSTITUENTS="${MAX_LARGE_R_CONSTITUENTS:-100}" \
+  MAX_SMALL_R_JETS="${MAX_SMALL_R_JETS:-10}" \
+  bash analysis/run.sh "$MG_tag" "$DELPHES_tag" "$num_runs" "$max_cpu_cores" || exit $?
   end=`date +%s`
   runtime=$((end-start))
-  echo -e "\tBatching Done!"
-  echo -e "\tTime (sec): $runtime"
-fi
-
-# Run training script
-if [ "$bypass_train" = false ]; then
-  echo "Please be patient for Training..."
-  start=`date +%s`
-  cd model
-  mkdir -p $dir_training
-  mkdir -p "$dir_training/models"
-  python -u New_Training.py $PY_tag $epochs $embed_dim $dir_datasets $dir_training $analysis_type | tee "${dir_training}/training.log"
-  cd $WORKING_DIR
-  end=`date +%s`
-  runtime=$((end-start))
-  echo -e "\tTraining Done!"
-  echo -e "\tTime (sec): $runtime"
+  echo -e "\tAnalysis Time (sec): $runtime"
 fi

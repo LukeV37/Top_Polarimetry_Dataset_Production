@@ -11,6 +11,7 @@ madgraph/pp_tt_semi_full*
 *.log
 pythia/WS*
 delphes/WS*
+analysis/WS_*
 model/WS*
 *__pycache__
 *.pt
