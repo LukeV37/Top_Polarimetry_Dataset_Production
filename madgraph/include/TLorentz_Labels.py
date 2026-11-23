@@ -15,10 +15,19 @@ class Event:
         self.lep = self.particle()
         self.nu = self.particle()
         
-        # Labels
-        self.top_label = self.particle()
-        self.down_label = self.particle()
-        self.b_label = self.particle()
+        # Explicit, unnormalized four-vectors for the public label tree.
+        self.top_lab = self.particle()
+        self.top_ttCM = self.particle()
+        self.top_topRest = self.particle()
+        self.down_lab = self.particle()
+        self.down_ttCM = self.particle()
+        self.down_topRest = self.particle()
+        self.b_lab = self.particle()
+        self.b_ttCM = self.particle()
+        self.b_topRest = self.particle()
+        self.W_lab = self.particle()
+        self.W_ttCM = self.particle()
+        self.W_topRest = self.particle()
         self.costheta = []
         
     def __len__(self):
@@ -50,41 +59,31 @@ class Event:
             self.py = np.concat((self.py, ak.to_numpy(py)))
             self.pz = np.concat((self.pz, ak.to_numpy(pz)))
             self.E = np.concat((self.E, ak.to_numpy(E)))
+
+        def initialize_four_vector(self, num_events):
+            self.px = np.full(num_events, -999.0, dtype=np.float32)
+            self.py = np.full(num_events, -999.0, dtype=np.float32)
+            self.pz = np.full(num_events, -999.0, dtype=np.float32)
+            self.E = np.full(num_events, -999.0, dtype=np.float32)
+
+        def set_four_vector(self, event, vector):
+            self.px[event] = vector.Px()
+            self.py[event] = vector.Py()
+            self.pz[event] = vector.Pz()
+            self.E[event] = vector.E()
             
     def calc_labels(self):
-        # Initialize Labels
-        self.top_label.px = np.ones_like(self.b.px)*-999
-        self.top_label.py = np.ones_like(self.b.px)*-999
-        self.top_label.pz = np.ones_like(self.b.px)*-999
-        self.top_label.E = np.ones_like(self.b.px)*-999
-        self.top_label.pT = np.ones_like(self.b.px)*-999
-        self.top_label.eta = np.ones_like(self.b.px)*-999
-        self.top_label.phi = np.ones_like(self.b.px)*-999
-        
-        self.down_label.px = np.ones_like(self.b.px)*-999
-        self.down_label.py = np.ones_like(self.b.px)*-999
-        self.down_label.pz = np.ones_like(self.b.px)*-999
-        self.down_label.E = np.ones_like(self.b.px)*-999
-        self.down_label.pT = np.ones_like(self.b.px)*-999
-        self.down_label.eta = np.ones_like(self.b.px)*-999
-        self.down_label.phi = np.ones_like(self.b.px)*-999
-        self.down_label.deltaR = np.ones_like(self.b.px)*-999
-        self.down_label.deltaEta = np.ones_like(self.b.px)*-999
-        self.down_label.deltaPhi = np.ones_like(self.b.px)*-999
-
-        self.b_label.px = np.ones_like(self.b.px)*-999
-        self.b_label.py = np.ones_like(self.b.px)*-999
-        self.b_label.pz = np.ones_like(self.b.px)*-999
-        self.b_label.E = np.ones_like(self.b.px)*-999
-        self.b_label.pT = np.ones_like(self.b.px)*-999
-        self.b_label.eta = np.ones_like(self.b.px)*-999
-        self.b_label.phi = np.ones_like(self.b.px)*-999
-        self.b_label.deltaR = np.ones_like(self.b.px)*-999
-        self.b_label.deltaEta = np.ones_like(self.b.px)*-999
-        self.b_label.deltaPhi = np.ones_like(self.b.px)*-999
-        
         self.costheta_down = np.ones_like(self.b.px)*-999
         self.costheta_bottom = np.ones_like(self.b.px)*-999
+
+        explicit_vectors = (
+            self.top_lab, self.top_ttCM, self.top_topRest,
+            self.down_lab, self.down_ttCM, self.down_topRest,
+            self.b_lab, self.b_ttCM, self.b_topRest,
+            self.W_lab, self.W_ttCM, self.W_topRest,
+        )
+        for vector in explicit_vectors:
+            vector.initialize_four_vector(len(self.b.px))
         
         # Loop over events and calculate labels
         for event in range(len(self)):
@@ -100,6 +99,15 @@ class Event:
             #Construct tops in lab frame by adding the corresponding decay products
             p_t = p_b + p_d + p_u 
             p_tbar = p_bbar + p_lm + p_vl
+            # Reconstruct the hadronic W from its two quark daughters. The W
+            # may not be present as a separate particle in the LHE record.
+            p_W = p_u + p_d
+
+            # Save actual lab-frame four-vectors before applying any boosts.
+            self.top_lab.set_four_vector(event, p_t)
+            self.b_lab.set_four_vector(event, p_b)
+            self.down_lab.set_four_vector(event, p_d)
+            self.W_lab.set_four_vector(event, p_W)
 
             #Construct Lorentz boost to t-tbar CM frame 
             to_ttbar_rest = -(p_t + p_tbar).BoostVector()
@@ -109,15 +117,13 @@ class Event:
             p_tbar.Boost(to_ttbar_rest)
             p_d.Boost(to_ttbar_rest)
             p_b.Boost(to_ttbar_rest)
+            p_W.Boost(to_ttbar_rest)
 
-            # Store top quark kinematics in ttbar CM frame
-            self.top_label.px[event] = p_t.Px()
-            self.top_label.py[event] = p_t.Py()
-            self.top_label.pz[event] = p_t.Pz()
-            self.top_label.E[event]  = p_t.E()
-            self.top_label.pT[event] = p_t.Pt()
-            self.top_label.eta[event] = p_t.Eta()
-            self.top_label.phi[event] = p_t.Phi()
+            # Save actual ttbar-CM-frame four-vectors.
+            self.top_ttCM.set_four_vector(event, p_t)
+            self.down_ttCM.set_four_vector(event, p_d)
+            self.b_ttCM.set_four_vector(event, p_b)
+            self.W_ttCM.set_four_vector(event, p_W)
 
             #Top quark direction in t-tbar CM frame
             k_vect = p_t.Vect().Unit()
@@ -125,35 +131,20 @@ class Event:
             #Define boost from t-tbar CM frame to top rest frame
             to_t_rest = -p_t.BoostVector()
 
-            #Boost down quark to top quark rest frame
+            # Save the top four-vector in its own rest frame as well.
+            p_t_topRest = TLorentzVector(p_t)
+            p_t_topRest.Boost(to_t_rest)
+            self.top_topRest.set_four_vector(event, p_t_topRest)
+
+            #Boost the hadronic decay products to the top quark rest frame.
             p_d.Boost(to_t_rest)
             p_b.Boost(to_t_rest)
+            p_W.Boost(to_t_rest)
 
-            # Store bottom quark kinematics in ttbar rest frame
-            norm = np.sqrt(p_b.Px()**2 + p_b.Py()**2 + p_b.Pz()**2)
-            self.b_label.px[event] = p_b.Px()/norm
-            self.b_label.py[event] = p_b.Py()/norm
-            self.b_label.pz[event] = p_b.Pz()/norm
-            self.b_label.E[event]  = p_b.E()
-            self.b_label.pT[event] = p_b.Pt()
-            self.b_label.eta[event] = p_b.Eta()
-            self.b_label.phi[event] = p_b.Phi()
-            self.b_label.deltaR[event] = p_b.DeltaR(p_t)
-            self.b_label.deltaEta[event] = p_b.Eta()-p_t.Eta()
-            self.b_label.deltaPhi[event] = p_b.DeltaPhi(p_t)
-
-            # Store down quark kinematics in t rest frame
-            norm = np.sqrt(p_d.Px()**2 + p_d.Py()**2 + p_d.Pz()**2)
-            self.down_label.px[event] = p_d.Px()/norm
-            self.down_label.py[event] = p_d.Py()/norm
-            self.down_label.pz[event] = p_d.Pz()/norm
-            self.down_label.E[event]  = p_d.E()            
-            self.down_label.pT[event] = p_d.Pt()
-            self.down_label.eta[event] = p_d.Eta()
-            self.down_label.phi[event] = p_d.Phi()
-            self.down_label.deltaR[event] = p_d.DeltaR(p_t)
-            self.down_label.deltaEta[event] = p_d.Eta()-p_t.Eta()
-            self.down_label.deltaPhi[event] = p_d.DeltaPhi(p_t)
+            # Save actual, unnormalized top-rest-frame four-vectors.
+            self.down_topRest.set_four_vector(event, p_d)
+            self.b_topRest.set_four_vector(event, p_b)
+            self.W_topRest.set_four_vector(event, p_W)
 
             #down quark direction in top rest frame
             d_vect = p_d.Vect().Unit()
@@ -165,68 +156,40 @@ class Event:
             
     def write_ntuple(self, tag, num):
         with uproot.recreate("pp_tt_semi_full_"+tag+"/labels_"+tag+"_"+num+".root") as f:
-            tree = f.mktree("labels", {"top_px": "float32",
-                                       "top_py": "float32",
-                                       "top_pz": "float32",
-                                       "top_E": "float32",
-                                       "top_pT": "float32",
-                                       "top_eta": "float32",
-                                       "top_phi": "float32",
-                                       "down_px": "float32",
-                                       "down_py": "float32",
-                                       "down_pz": "float32",
-                                       "down_E": "float32",
-                                       "down_pT": "float32",
-                                       "down_eta": "float32",
-                                       "down_phi": "float32",
-                                       "down_deltaR": "float32",
-                                       "down_deltaEta": "float32",
-                                       "down_deltaPhi": "float32",
-                                       "bottom_px": "float32",
-                                       "bottom_py": "float32",
-                                       "bottom_pz": "float32",
-                                       "bottom_E": "float32",
-                                       "bottom_pT": "float32",
-                                       "bottom_eta": "float32",
-                                       "bottom_phi": "float32",
-                                       "bottom_deltaR": "float32",
-                                       "bottom_deltaEta": "float32",
-                                       "bottom_deltaPhi": "float32",
-                                       "costheta_down": "float32",
-                                       "costheta_bottom": "float32",
-                                       }
-                           )
-            tree.extend( {"top_px": self.top_label.px,
-                          "top_py": self.top_label.py,
-                          "top_pz": self.top_label.pz,
-                          "top_E" : self.top_label.E,
-                          "top_pT" : self.top_label.pT,
-                          "top_eta" : self.top_label.eta,
-                          "top_phi" : self.top_label.phi,
-                          "down_px": self.down_label.px,
-                          "down_py": self.down_label.py,
-                          "down_pz": self.down_label.pz,
-                          "down_E" : self.down_label.E,
-                          "down_pT" : self.down_label.pT,
-                          "down_eta" : self.down_label.eta,
-                          "down_phi" : self.down_label.phi,
-                          "down_deltaR" : self.down_label.deltaR,
-                          "down_deltaEta" : self.down_label.deltaEta,
-                          "down_deltaPhi" : self.down_label.deltaPhi,
-                          "bottom_px": self.b_label.px,
-                          "bottom_py": self.b_label.py,
-                          "bottom_pz": self.b_label.pz,
-                          "bottom_E" : self.b_label.E,
-                          "bottom_pT" : self.b_label.pT,
-                          "bottom_eta" : self.b_label.eta,
-                          "bottom_phi" : self.b_label.phi,
-                          "bottom_deltaR" : self.b_label.deltaR,
-                          "bottom_deltaEta" : self.b_label.deltaEta,
-                          "bottom_deltaPhi" : self.b_label.deltaPhi,
-                          "costheta_down": self.costheta_down,
-                          "costheta_bottom": self.costheta_bottom,
-                         }
-                       )
+            branches = {"costheta_down": "float32",
+                        "costheta_bottom": "float32"}
+
+            explicit_vectors = {
+                "top": {"lab": self.top_lab,
+                        "ttCM": self.top_ttCM,
+                        "topRest": self.top_topRest},
+                "bottom": {"lab": self.b_lab,
+                           "ttCM": self.b_ttCM,
+                           "topRest": self.b_topRest},
+                "down": {"lab": self.down_lab,
+                         "ttCM": self.down_ttCM,
+                         "topRest": self.down_topRest},
+                "W": {"lab": self.W_lab,
+                      "ttCM": self.W_ttCM,
+                      "topRest": self.W_topRest},
+            }
+            components = ("px", "py", "pz", "E")
+            for object_name, frames in explicit_vectors.items():
+                for frame_name in frames:
+                    for component in components:
+                        branches[f"{object_name}_{component}_{frame_name}"] = "float32"
+
+            tree = f.mktree("labels", branches)
+
+            data = {"costheta_down": self.costheta_down,
+                    "costheta_bottom": self.costheta_bottom}
+
+            for object_name, frames in explicit_vectors.items():
+                for frame_name, vector in frames.items():
+                    for component in components:
+                        data[f"{object_name}_{component}_{frame_name}"] = getattr(vector, component)
+
+            tree.extend(data)
 
 # Get dataset tag
 dataset_tag=str(sys.argv[1])
@@ -248,49 +211,44 @@ with uproot.open('pp_tt_semi_full_'+dataset_tag+'/hard_process_'+dataset_tag+'_'
 # Initialize Event object
 event = Event()
 
-# Generate down masks
-d_mask = (abs(pid)==1)
-s_mask = (abs(pid)==3)
-status = status>0
-# Particle can be down OR strange AND must not be parton of incoming proton
-mask = (d_mask | s_mask) & status
-event.d.add_feats(np.ravel(px[mask]),np.ravel(py[mask]),np.ravel(pz[mask]),np.ravel(E[mask]))
+def add_one_particle_per_event(mask, particle, particle_name):
+    """Keep the existing PID-mask approach and ensure event order is intact."""
+    counts = np.asarray(ak.to_numpy(ak.sum(mask, axis=1)))
+    bad_events = np.flatnonzero(counts != 1)
+    if len(bad_events):
+        examples = bad_events[:10].tolist()
+        raise ValueError(
+            f"Expected exactly one final-state {particle_name} per event; "
+            f"found counts {counts[bad_events[:10]].tolist()} in entries {examples}"
+        )
 
-# Generate up masks
-u_mask = (abs(pid)==2)
-c_mask = (abs(pid)==4)
-status = status>0
-# Particle can be up OR charm AND must not be parton of incoming proton
-mask = (u_mask | c_mask) & status
-event.u.add_feats(np.ravel(px[mask]),np.ravel(py[mask]),np.ravel(pz[mask]),np.ravel(E[mask]))
+    particle.add_feats(
+        np.ravel(px[mask]), np.ravel(py[mask]), np.ravel(pz[mask]), np.ravel(E[mask])
+    )
 
-# Generate b masks
-b_mask = pid==5
-status = status>0
-# Particle is bottom and must not be parton of incoming proton
-mask = b_mask & status
-event.b.add_feats(np.ravel(px[mask]),np.ravel(py[mask]),np.ravel(pz[mask]),np.ravel(E[mask]))
 
-# Generate anti-b masks
-b_mask = pid==-5
-status = status>0
-# Particle is anti-bottom and must not be parton of incoming proton
-mask = b_mask & status
-event.bbar.add_feats(np.ravel(px[mask]),np.ravel(py[mask]),np.ravel(pz[mask]),np.ravel(E[mask]))
-
-# Generate lepton masks
-el_mask = (abs(pid)==11)
-mu_mask = (abs(pid)==13)
-# Particle can be electron OR muon
-mask = (el_mask | mu_mask)
-event.lep.add_feats(np.ravel(px[mask]),np.ravel(py[mask]),np.ravel(pz[mask]),np.ravel(E[mask]))
-
-# Generate neutrino masks
-nu_el_mask = (abs(pid)==12)
-nu_mu_mask = (abs(pid)==14)
-# Particle can be nu_el OR nu_mu
-mask = (nu_el_mask | nu_mu_mask)
-event.nu.add_feats(np.ravel(px[mask]),np.ravel(py[mask]),np.ravel(pz[mask]),np.ravel(E[mask]))
+# This is a fixed MadGraph process: identify its decay products by PID and
+# final-state status, without adding ancestry-based selection.
+final_state = status > 0
+abs_pid = abs(pid)
+particle_masks = (
+    ((abs_pid == 1) | (abs_pid == 3)) & final_state,
+    ((abs_pid == 2) | (abs_pid == 4)) & final_state,
+    (pid == 5) & final_state,
+    (pid == -5) & final_state,
+    ((abs_pid == 11) | (abs_pid == 13)) & final_state,
+    ((abs_pid == 12) | (abs_pid == 14)) & final_state,
+)
+particle_targets = (
+    (event.d, "down-type quark"),
+    (event.u, "up-type quark"),
+    (event.b, "bottom quark"),
+    (event.bbar, "antibottom quark"),
+    (event.lep, "charged lepton"),
+    (event.nu, "neutrino"),
+)
+for mask, (particle, particle_name) in zip(particle_masks, particle_targets):
+    add_one_particle_per_event(mask, particle, particle_name)
 
 # Calculate and write labels
 #print("\tCalculating Labels...")
