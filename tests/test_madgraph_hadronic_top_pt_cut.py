@@ -104,16 +104,25 @@ def generated_sample(
         )
     )
 
-    result = subprocess.run(
-        [str(REPO_ROOT / "run_job.sh"), str(job_config)],
-        cwd=REPO_ROOT,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        text=True,
-        timeout=600,
-        check=False,
-    )
+    print(f"[RUN] Generating hadronic-top pT sample at {threshold:g} GeV")
+    try:
+        result = subprocess.run(
+            [str(REPO_ROOT / "run_job.sh"), str(job_config)],
+            cwd=REPO_ROOT,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            timeout=600,
+            check=False,
+        )
+    except subprocess.TimeoutExpired:
+        print(f"[FAIL] MadGraph generation timed out at {threshold:g} GeV")
+        raise
     if result.returncode != 0:
+        print(
+            f"[FAIL] MadGraph generation at {threshold:g} GeV "
+            f"(exit {result.returncode})"
+        )
         pytest.fail(
             f"MadGraph job failed for {threshold:g} GeV (exit {result.returncode}). "
             "The generated files and log were left in place for diagnosis.\n"
@@ -131,6 +140,17 @@ def generated_sample(
 
 
 def test_custom_cut_source_uses_configured_hadronic_top_pt() -> None:
+    test_name = "custom hadronic-top pT cut source"
+    try:
+        _assert_custom_cut_source_uses_configured_hadronic_top_pt()
+    except Exception as error:
+        detail = str(error).splitlines()[0] if str(error) else type(error).__name__
+        print(f"[FAIL] {test_name}: {detail}")
+        raise
+    print(f"[PASS] {test_name}")
+
+
+def _assert_custom_cut_source_uses_configured_hadronic_top_pt() -> None:
     source_path = MADGRAPH_DIR / "configs" / "hadronic_top_pt_cut.f"
     source = _normalise_fortran(source_path.read_text())
 
@@ -143,6 +163,20 @@ def test_custom_cut_source_uses_configured_hadronic_top_pt() -> None:
 
 
 def test_generated_sample_applies_cut_and_matches_truth_labels(
+    generated_sample: tuple[float, str, Path],
+) -> None:
+    threshold = generated_sample[0]
+    test_name = f"generated sample and truth labels ({threshold:g} GeV)"
+    try:
+        _assert_generated_sample_applies_cut_and_matches_truth_labels(generated_sample)
+    except Exception as error:
+        detail = str(error).splitlines()[0] if str(error) else type(error).__name__
+        print(f"[FAIL] {test_name}: {detail}")
+        raise
+    print(f"[PASS] {test_name}")
+
+
+def _assert_generated_sample_applies_cut_and_matches_truth_labels(
     generated_sample: tuple[float, str, Path],
 ) -> None:
     threshold, tag, process_dir = generated_sample
@@ -213,21 +247,76 @@ def test_generated_sample_applies_cut_and_matches_truth_labels(
         with uproot.open(labels_root) as label_file:
             labels = label_file["labels"]
             label_entries = labels.num_entries
-            label_top_pts = labels["top_pT"].array(library="np")
             costheta_down = labels["costheta_down"].array(library="np")
             costheta_bottom = labels["costheta_bottom"].array(library="np")
+            vector_branches = [
+                f"{obj}_{component}_{frame}"
+                for obj in ("top", "bottom", "down", "W")
+                for frame in ("lab", "ttCM", "topRest")
+                for component in ("px", "py", "pz", "E")
+            ]
+            vectors = labels.arrays(vector_branches, library="np")
+
+        label_top_pts = np.sqrt(vectors["top_px_lab"] ** 2 + vectors["top_py_lab"] ** 2)
+
+        min_lhe_top_pt = float(np.min(lab_top_pts))
+        min_label_top_pt = (
+            float(np.min(label_top_pts)) if len(label_top_pts) else float("nan")
+        )
+        print(
+            f"[INFO] {threshold:g} GeV cut, run {run_index}: minimum hadronic-top "
+            f"pT: LHE={min_lhe_top_pt:.6f} GeV, "
+            f"label ROOT={min_label_top_pt:.6f} GeV"
+        )
 
         assert len(lab_top_pts) == hard_entries == label_entries, (
             f"Entry mismatch for {tag} run {run_index}: "
             f"LHE={len(lab_top_pts)}, hard-process={hard_entries}, "
             f"labels={label_entries}"
         )
-        assert np.isfinite(label_top_pts).all(), f"Non-finite top_pT in {labels_root}"
+        assert np.isfinite(label_top_pts).all(), f"Non-finite lab-frame top pT in {labels_root}"
         assert np.isfinite(costheta_down).all() and np.isfinite(costheta_bottom).all(), (
             f"Non-finite angular labels in {labels_root}"
         )
         assert ((costheta_down >= -1.00001) & (costheta_down <= 1.00001)).all()
         assert ((costheta_bottom >= -1.00001) & (costheta_bottom <= 1.00001)).all()
+        for branch in vector_branches:
+            assert np.isfinite(vectors[branch]).all(), (
+                f"Non-finite four-vector values in {branch}"
+            )
+
+        def four_vector(obj: str, frame: str) -> np.ndarray:
+            return np.stack(
+                [vectors[f"{obj}_{component}_{frame}"] for component in ("px", "py", "pz", "E")],
+                axis=1,
+            )
+
+        def invariant_mass_squared(vector: np.ndarray) -> np.ndarray:
+            return vector[:, 3] ** 2 - np.sum(vector[:, :3] ** 2, axis=1)
+
+        np.testing.assert_allclose(
+            four_vector("top", "lab"),
+            four_vector("bottom", "lab") + four_vector("W", "lab"),
+            rtol=2e-6,
+            atol=2e-4,
+            err_msg="Lab-frame top does not equal bottom plus reconstructed W",
+        )
+        for obj in ("top", "bottom", "down", "W"):
+            lab_mass_squared = invariant_mass_squared(four_vector(obj, "lab"))
+            for frame in ("ttCM", "topRest"):
+                np.testing.assert_allclose(
+                    invariant_mass_squared(four_vector(obj, frame)),
+                    lab_mass_squared,
+                    rtol=3e-4,
+                    atol=0.5,
+                    err_msg=f"{obj} invariant mass changed in {frame} frame",
+                )
+        np.testing.assert_allclose(
+            four_vector("top", "topRest")[:, :3],
+            0.0,
+            atol=2e-3,
+            err_msg="Top is not at rest in the topRest frame",
+        )
 
         np.testing.assert_allclose(
             label_top_pts,
@@ -241,6 +330,6 @@ def test_generated_sample_applies_cut_and_matches_truth_labels(
             f"{tag} run {run_index}; minimum={lab_top_pts.min():.6f} GeV"
         )
         assert (label_top_pts >= threshold - 1e-3).all(), (
-            f"Truth labels have a top_pT below {threshold:g} GeV in "
+            f"Truth labels have a lab-frame top pT below {threshold:g} GeV in "
             f"{tag} run {run_index}; minimum={label_top_pts.min():.6f} GeV"
         )
