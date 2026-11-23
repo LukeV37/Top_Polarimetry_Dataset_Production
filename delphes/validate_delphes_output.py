@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 from pathlib import Path
+import re
 
 import numpy as np
 import uproot
@@ -16,6 +17,17 @@ def count_hepmc_events(path: Path) -> int:
             if len(line) >= 2 and line[0] == "E" and line[1].isspace():
                 count += 1
     return count
+
+
+def count_streamed_events(log: Path) -> int:
+    # Pythia emits this completion line only after closing the HepMC stream.
+    text = log.read_text(encoding="utf-8", errors="replace")
+    counts = re.findall(r"^HEPMC_EVENTS_WRITTEN=(\d+)$", text, re.MULTILINE)
+    if not counts:  # A running job may still use the previous Pythia executable.
+        counts = re.findall(r"^Successfully wrote (\d+) events to .+$", text, re.MULTILINE)
+    if len(counts) != 1 or int(counts[0]) == 0:
+        raise SystemExit(f"Expected one successful, nonempty HepMC stream in {log}")
+    return int(counts[0])
 
 
 def flatten_single_value_objects(values: np.ndarray) -> np.ndarray:
@@ -32,19 +44,31 @@ def flatten_single_value_objects(values: np.ndarray) -> np.ndarray:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Validate Delphes output against its HepMC input.")
-    parser.add_argument("--hepmc", required=True, help="Input HepMC file used for Delphes.")
+    source = parser.add_mutually_exclusive_group(required=True)
+    source.add_argument("--hepmc", type=Path, help="Input HepMC file used for Delphes.")
+    source.add_argument("--pythia-log", type=Path, help="Pythia log for a streamed HepMC input.")
+    parser.add_argument("--labels", type=Path, help="MadGraph label ROOT file (required for streaming).")
     parser.add_argument("--root", required=True, help="Delphes ROOT output file to validate.")
     args = parser.parse_args()
-
-    hepmc_path = Path(args.hepmc)
     root_path = Path(args.root)
 
-    if not hepmc_path.is_file() or hepmc_path.stat().st_size == 0:
-        raise SystemExit(f"Missing or empty HepMC input: {hepmc_path}")
+    if args.pythia_log and not args.labels:
+        parser.error("--pythia-log requires --labels")
     if not root_path.is_file() or root_path.stat().st_size == 0:
         raise SystemExit(f"Missing or empty Delphes ROOT output: {root_path}")
 
-    hepmc_events = count_hepmc_events(hepmc_path)
+    if args.hepmc:
+        if not args.hepmc.is_file() or args.hepmc.stat().st_size == 0:
+            raise SystemExit(f"Missing or empty HepMC input: {args.hepmc}")
+        hepmc_events = count_hepmc_events(args.hepmc)
+    else:
+        hepmc_events = count_streamed_events(args.pythia_log)
+
+    if args.labels:
+        with uproot.open(args.labels) as label_file:
+            label_events = label_file["labels"].num_entries
+        if label_events != hepmc_events:
+            raise SystemExit(f"MadGraph/HepMC event-count mismatch: labels={label_events}, HepMC={hepmc_events}")
 
     with uproot.open(root_path) as root_file:
         if "Delphes" not in root_file:
@@ -69,7 +93,7 @@ def main() -> int:
             f"Expected 0..{root_events - 1}; first values: [{preview}]"
         )
 
-    print(f"Validated {root_events} Delphes events against {hepmc_path.name}")
+    print(f"Validated {root_events} Delphes events against {(args.hepmc or args.pythia_log).name}")
     return 0
 
 

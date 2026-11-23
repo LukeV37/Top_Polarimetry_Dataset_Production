@@ -31,6 +31,21 @@ cd pythia
 Pythia writes one HepMC file per run. Delphes reads those files and writes
 reconstructed objects to ROOT.
 
+To skip writing the intermediate HepMC files on Linux, enable streaming from
+the repository root, for example:
+
+```bash
+stream_hepmc=true ./run_job.sh debug.config
+```
+
+You can also set `stream_hepmc=true` in a job config. The default remains
+file-based. In streaming mode, Pythia and Delphes must both run or both be
+bypassed. Each pair gets separate logs under `delphes/WS_<DELPHES_TAG>/logs/`.
+The runner uses at most `max_cpu_cores / 2` pairs (rounded down, at least one),
+and publishes each Delphes ROOT file only after checking process status, counts
+against the MadGraph labels, and Delphes event order. The analysis inputs and
+outputs are unchanged. Rerunning Delphes in this mode also reruns Pythia.
+
 ### ROOT analysis selection (MVP)
 
 Run the debug configuration from the repository root with ROOT (`root-config`)

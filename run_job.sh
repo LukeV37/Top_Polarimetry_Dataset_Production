@@ -7,6 +7,16 @@ else
   source "$1" || exit $?
 fi
 
+stream_hepmc=${stream_hepmc:-false}
+case "$stream_hepmc" in
+  true|false) ;;
+  *) echo "stream_hepmc must be true or false" >&2; exit 1 ;;
+esac
+if [[ "$stream_hepmc" == true && "$bypass_pythia" != "$bypass_delphes" ]]; then
+  echo "With stream_hepmc=true, Pythia and Delphes must both run or both be bypassed." >&2
+  exit 1
+fi
+
 # Setup python venv
 source setup.sh || exit $?
 
@@ -22,8 +32,8 @@ if [ "$bypass_madgraph" = false ]; then
   echo -e "\tTime (sec): $runtime"
 fi
 
-# Run Pythia Showering
-if [ "$bypass_pythia" = false ]; then
+# Run Pythia separately only in file-based mode.
+if [[ "$bypass_pythia" == false && "$stream_hepmc" == false ]]; then
   start=`date +%s`
   (
     cd pythia || exit 1
@@ -52,6 +62,12 @@ if [ "$bypass_delphes" = false ]; then
   : "${delphes_small_r_parton_ptmin:?Missing delphes_small_r_parton_ptmin in config}"
   : "${delphes_small_r_parton_eta_max:?Missing delphes_small_r_parton_eta_max in config}"
   start=`date +%s`
+  delphes_args=("$PY_tag" "$DELPHES_tag" "$num_runs" "$max_cpu_cores")
+  stage="Delphes"
+  if [[ "$stream_hepmc" == true ]]; then
+    delphes_args+=("${MG_tag:?Missing MG_tag in config}")
+    stage="Pythia + Delphes"
+  fi
   (
     cd delphes || exit 1
     DELPHES_CARD_TEMPLATE="$delphes_card_template" \
@@ -64,12 +80,12 @@ if [ "$bypass_delphes" = false ]; then
     DELPHES_SMALL_R_JET_FLAVOR_DR="$delphes_small_r_jet_flavor_dr" \
     DELPHES_SMALL_R_PARTON_PTMIN="$delphes_small_r_parton_ptmin" \
     DELPHES_SMALL_R_PARTON_ETA_MAX="$delphes_small_r_parton_eta_max" \
-    ./run.sh "$PY_tag" "$DELPHES_tag" "$num_runs" "$max_cpu_cores"
+    ./run.sh "${delphes_args[@]}"
   )
   delphes_status=$?
   end=`date +%s`
   runtime=$((end-start))
-  echo -e "\tDelphes Time (sec): $runtime"
+  echo -e "\t$stage Time (sec): $runtime"
   if [ "$delphes_status" -ne 0 ]; then
     exit "$delphes_status"
   fi
