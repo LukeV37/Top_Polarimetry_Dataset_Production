@@ -10,6 +10,7 @@ madgraph/pp_tt_semi_full*
 *.png
 *.log
 pythia/WS*
+delphes/WS*
 model/WS*
 *__pycache__
 *.pt

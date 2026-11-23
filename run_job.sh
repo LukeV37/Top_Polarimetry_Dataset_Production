@@ -12,8 +12,6 @@ WORKING_DIR=$(pwd)
 
 # Setup python venv
 source setup.sh
-top_pT_cut=${top_pT_cut:-200}
-generation=${generation:-inclusive}
 
 # Run MadGraph Generation
 if [ "$bypass_madgraph" = false ]; then
@@ -33,12 +31,54 @@ num_batches=$(python -c "print(int($num_runs/float($max_cpu_cores))) if $num_run
 # Run Pythia Showering
 if [ "$bypass_pythia" = false ]; then
   start=`date +%s`
-  cd pythia
-  ./run.sh $MG_tag $PY_tag $num_runs $max_cpu_cores $R $minJetpT
-  cd $WORKING_DIR
+  (
+    cd pythia || exit 1
+    ./run.sh "$MG_tag" "$PY_tag" "$num_runs" "$max_cpu_cores"
+  )
+  pythia_status=$?
   end=`date +%s`
   runtime=$((end-start))
-  echo -e "\tTime (sec): $runtime"
+  echo -e "\tPythia Time (sec): $runtime"
+  if [ "$pythia_status" -ne 0 ]; then
+    exit "$pythia_status"
+  fi
+fi
+
+# Run Delphes detector simulation
+if [ "$bypass_delphes" = false ]; then
+  : "${DELPHES_tag:?Missing DELPHES_tag in config}"
+  : "${delphes_card_template:?Missing delphes_card_template in config}"
+  : "${delphes_small_r_algorithm:?Missing delphes_small_r_algorithm in config}"
+  : "${delphes_small_r:?Missing delphes_small_r in config}"
+  : "${delphes_small_r_jet_ptmin:?Missing delphes_small_r_jet_ptmin in config}"
+  : "${delphes_large_r_algorithm:?Missing delphes_large_r_algorithm in config}"
+  : "${delphes_large_r:?Missing delphes_large_r in config}"
+  : "${delphes_large_r_jet_ptmin:?Missing delphes_large_r_jet_ptmin in config}"
+  : "${delphes_small_r_jet_flavor_dr:?Missing delphes_small_r_jet_flavor_dr in config}"
+  : "${delphes_small_r_parton_ptmin:?Missing delphes_small_r_parton_ptmin in config}"
+  : "${delphes_small_r_parton_eta_max:?Missing delphes_small_r_parton_eta_max in config}"
+  start=`date +%s`
+  (
+    cd delphes || exit 1
+    DELPHES_CARD_TEMPLATE="$delphes_card_template" \
+    DELPHES_SMALL_R_ALGORITHM="$delphes_small_r_algorithm" \
+    DELPHES_SMALL_R="$delphes_small_r" \
+    DELPHES_SMALL_R_PTMIN="$delphes_small_r_jet_ptmin" \
+    DELPHES_LARGE_R_ALGORITHM="$delphes_large_r_algorithm" \
+    DELPHES_LARGE_R="$delphes_large_r" \
+    DELPHES_LARGE_R_PTMIN="$delphes_large_r_jet_ptmin" \
+    DELPHES_SMALL_R_JET_FLAVOR_DR="$delphes_small_r_jet_flavor_dr" \
+    DELPHES_SMALL_R_PARTON_PTMIN="$delphes_small_r_parton_ptmin" \
+    DELPHES_SMALL_R_PARTON_ETA_MAX="$delphes_small_r_parton_eta_max" \
+    ./run.sh "$PY_tag" "$DELPHES_tag" "$num_runs" "$max_cpu_cores"
+  )
+  delphes_status=$?
+  end=`date +%s`
+  runtime=$((end-start))
+  echo -e "\tDelphes Time (sec): $runtime"
+  if [ "$delphes_status" -ne 0 ]; then
+    exit "$delphes_status"
+  fi
 fi
 
 # Run preprocessing to match fat jets to top quarks
