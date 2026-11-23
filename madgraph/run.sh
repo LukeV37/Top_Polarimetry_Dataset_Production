@@ -84,7 +84,7 @@ grep -i "min_hadronic_top_pt" "$process_dir/Cards/run_card.dat" >/dev/null
 
 # Generate the events.
 echo "Please be patient while MadGraph generates processes..."
-"$process_dir/bin/madevent" multi_run.tmp | tee "MadGraph_${dataset_tag}.log"
+"$process_dir/bin/madevent" multi_run.tmp >"MadGraph_${dataset_tag}.log" 2>&1
 
 # Verify MadGraph applied the runtime run-card overrides and installed the custom
 # dummy_cuts hook instead of patching cuts.f.
