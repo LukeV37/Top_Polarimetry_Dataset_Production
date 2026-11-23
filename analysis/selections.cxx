@@ -267,13 +267,11 @@ void select(TTree &delphes, TTree &truth, TFile &output, const Config &cfg)
     selected.GetUserInfo()->Add(new TParameter<double>("JET_OVERLAP_DR", cfg.overlapDR));
     for (auto &label : labels) bindLabel(truth, selected, label);
 
-    Long64_t sourceEntry = 0;
     Float_t leptonPt = 0, leptonEta = 0, leptonPhi = 0, isolation = 0, isolationRho = 0;
     Float_t met = 0, metPhi = 0;
     Int_t leptonCharge = 0, leptonFlavor = 0;
     Kinematics largeJet;
     Counts constituentCounts, smallJetCounts;
-    outputBranch(selected, "source_entry", &sourceEntry, 'L');
     outputBranch(selected, "lepton_pt", &leptonPt, 'F');
     outputBranch(selected, "lepton_eta", &leptonEta, 'F');
     outputBranch(selected, "lepton_phi", &leptonPhi, 'F');
@@ -300,7 +298,7 @@ void select(TTree &delphes, TTree &truth, TFile &output, const Config &cfg)
     Long64_t passLepton = 0, passMet = 0, passLargeJet = 0;
     Long64_t acceptedElectrons = 0, acceptedMuons = 0;
     Long64_t constituentOverflow = 0, smallJetOverflow = 0;
-    for (sourceEntry = 0; sourceEntry < entries; ++sourceEntry) {
+    for (Long64_t sourceEntry = 0; sourceEntry < entries; ++sourceEntry) {
         try {
             events.read(sourceEntry);
             if (events.size() != 1 || events.get<HepMCEvent>(0).Number != sourceEntry)

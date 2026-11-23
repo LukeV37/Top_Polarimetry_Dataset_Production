@@ -3,6 +3,7 @@
 import math
 import os
 from pathlib import Path
+import re
 import shutil
 import subprocess
 
@@ -135,11 +136,11 @@ def test_debug_join_and_cutflow(debug_inputs, tmp_path, nc, nj, overlap_dr):
             assert f"{name}: {count}\n" in log
         assert f"Accepted electrons: {sum(row[1] == 11 for row in expected.values())}\n" in log
         assert f"Accepted muons: {sum(row[1] == 13 for row in expected.values())}\n" in log
-        np.testing.assert_array_equal(output["source_entry"], list(expected))
+        assert "source_entry" not in output
         with uproot.open(f"{labels[i]}:labels") as tree:
             assert len(tree.keys()) == 50
             for name, values in tree.arrays(library="np").items():
-                np.testing.assert_array_equal(output[name], values[output["source_entry"]])
+                np.testing.assert_array_equal(output[name], values[list(expected)])
         for row, (lepton, flavor, met, large, constituents, jets) in enumerate(expected.values()):
             for name, field in [("pt", "PT"), ("eta", "Eta"), ("phi", "Phi"), ("charge", "Charge"),
                                 ("isolation", "IsolationVar"), ("isolation_rho_corr", "IsolationVarRhoCorr")]:
@@ -279,14 +280,30 @@ def test_boundaries_and_event_sequence(root_build, tmp_path):
              for comp in ("px", "py", "pz", "E") for frame in ("lab", "ttCM", "topRest")]
     names += ["costheta_down", "costheta_bottom"]
     with uproot.recreate(labels) as file:
-        file.mktree("labels", {name: np.zeros(entries, dtype=np.float32) for name in names})
+        data = {name: np.zeros(entries, dtype=np.float32) for name in names}
+        # Give each input a distinct test-only truth value to identify selected
+        # entries without an event-index branch in the output.
+        data["top_px_lab"] = np.arange(entries, dtype=np.float32)
+        file.mktree("labels", data)
 
     output = tmp_path / "selected.root"
     cmd = [ANALYSIS / "run_selections", reco, labels, output, "1.5", "0.5"]
     env = analysis_env(LEPTON_B_JET_DR_MIN="0.5", JET_OVERLAP_DR="2.0")
     subprocess.run(cmd, env=env, check=True)
     with uproot.open(f"{output}:selected") as tree:
-        assert tree["source_entry"].array().tolist() == [0, 8, 9, 10, 11]
+        assert "source_entry" not in tree
+        documented = re.findall(
+            r"^\| `([A-Za-z0-9_]+)` \| `(Float_t|Int_t)(?:\[(Nc|Nj)\])?` \|",
+            (ANALYSIS / "README.md").read_text(), flags=re.MULTILINE,
+        )
+        assert len(documented) == 85
+        assert set(name for name, _, _ in documented) == set(tree.keys())
+        for name, dtype, capacity in documented:
+            values = tree[name].array(library="np")
+            assert values.dtype == {"Float_t": np.dtype("float32"), "Int_t": np.dtype("int32")}[dtype]
+            shape = {"": (), "Nc": (100,), "Nj": (10,)}[capacity]
+            assert values.shape == (tree.num_entries, *shape)
+        assert tree["top_px_lab"].array().tolist() == [0, 8, 9, 10, 11]
         assert tree["lepton_flavor"].array().tolist() == [11, 13, 13, 11, 11]
         assert tree["lepton_pt"].array().tolist() == [30, 30, 50, 50, 30]
         assert tree["num_constituents"].array().tolist() == [0] * 5
@@ -296,7 +313,7 @@ def test_boundaries_and_event_sequence(root_build, tmp_path):
     subprocess.run([ANALYSIS / "run_selections", reco, labels, default_output, "1.5", "0.5"],
                    env=analysis_env(LEPTON_B_JET_DR_MIN="0.5"), check=True)
     with uproot.open(f"{default_output}:selected") as tree:
-        assert tree["source_entry"].array().tolist() == [0, 1, 8, 9, 10, 11, 13]
+        assert tree["top_px_lab"].array().tolist() == [0, 1, 8, 9, 10, 11, 13]
 
     # Flavor thresholds can be changed independently. At a pT tie the first
     # eligible electron wins; raising its threshold leaves the muon eligible.
@@ -305,14 +322,14 @@ def test_boundaries_and_event_sequence(root_build, tmp_path):
                    env=analysis_env(LEPTON_B_JET_DR_MIN="0.5", JET_OVERLAP_DR="2.0",
                                     ELECTRON_PT_MIN="40"), check=True)
     with uproot.open(f"{threshold_output}:selected") as tree:
-        assert tree["source_entry"].array().tolist() == [8, 9, 10, 11]
+        assert tree["top_px_lab"].array().tolist() == [8, 9, 10, 11]
         assert tree["lepton_flavor"].array().tolist() == [13, 13, 11, 13]
 
     subprocess.run([ANALYSIS / "run_selections", reco, labels, threshold_output, "1.5", "0.5"],
                    env=analysis_env(LEPTON_B_JET_DR_MIN="0.5", JET_OVERLAP_DR="2.0",
                                     MUON_PT_MIN="40"), check=True)
     with uproot.open(f"{threshold_output}:selected") as tree:
-        assert tree["source_entry"].array().tolist() == [0, 9, 10, 11]
+        assert tree["top_px_lab"].array().tolist() == [0, 9, 10, 11]
         assert tree["lepton_flavor"].array().tolist() == [11, 13, 11, 11]
 
     previous = output.read_bytes()
